@@ -434,13 +434,14 @@ void Main_Menu(void)
 		}
 		else if (key == 0x33)
 		{
-			JumpAddress = *(__IO uint32_t*) (ApplicationAddress + 4);
+			NVIC_SystemReset();    //2023-02-02  改为重启了
+//			JumpAddress = *(__IO uint32_t*) (ApplicationAddress + 4);
 
-			/* Jump to user application */
-			Jump_To_Application = (pFunction) JumpAddress;
-			/* Initialize user application's Stack Pointer */
-			__set_MSP(*(__IO uint32_t*) ApplicationAddress);
-			Jump_To_Application();
+//			/* Jump to user application */
+//			Jump_To_Application = (pFunction) JumpAddress;
+//			/* Initialize user application's Stack Pointer */
+//			__set_MSP(*(__IO uint32_t*) ApplicationAddress);
+//			Jump_To_Application();
 		}
 		else if ((key == 0x34) && (FlashProtection == 1))
 		{

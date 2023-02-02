@@ -85,9 +85,11 @@ void Led_Show_Work_ToggleOut(void)
   */
 int main(void)
 {
-	uint8_t key;
-	uint16_t count = 0;
+//	uint8_t key;
+//	uint16_t count = 0;
 	uint8_t enter_iap = 0;	
+	
+	nvic_vector_table_set(NVIC_VECTTAB_FLASH, 0x1d000);   //注意变化！！！2023-02-01
 	
 	//0. 中断分组初始化
 	nvic_priority_group_set(NVIC_PRIGROUP_PRE2_SUB2);    //2022-09-09 优先级被我修改了，现在只有抢占优先级了！！
@@ -98,6 +100,9 @@ int main(void)
 	//只保留sw接口，其他用于GPIO端口
 	gpio_pin_remap_config(GPIO_SWJ_SWDPENABLE_REMAP, ENABLE);
 	
+	//串口初始化
+	IAP_Init();
+	
 	//led引脚初始化部分
 	Led_Show_Work_init();
 	
@@ -106,23 +111,24 @@ int main(void)
 	/* Flash unlock */
 	fmc_unlock();
 
-	//串口初始化
-	IAP_Init();
+	//__enable_irq(); // 开启总中断
+	
 	SerialPutString("=gd32 bootloader start======\r\n");
+	enter_iap = 1;
   /* Initialize Key Button mounted on STM3210X-EVAL board */
   //STM_EVAL_PBInit();
-	while(count++ < 200)  //等待1000次
-	{
-		if (SerialKeyPressed((uint8_t*)&key))
-		{
-			if(key == 3)//(key == 'c' || key == 'C')  //ctrl + c
-			{
-				enter_iap = 1;
-				break;
-			}
-		}
-		Delay1ms(1)	;	
-	}
+//	while(count++ < 200)  //等待1000次
+//	{
+//		if (SerialKeyPressed((uint8_t*)&key))
+//		{
+//			if(key == 3)//(key == 'c' || key == 'C')  //ctrl + c
+//			{
+//				enter_iap = 1;
+//				break;
+//			}
+//		}
+//		Delay1ms(1)	;	
+//	}
   
 
   /*读串口数据，看是否有*/
@@ -130,7 +136,6 @@ int main(void)
 	{
 		/* If Key is pressed */
 		/* Execute the IAP driver in order to re-program the Flash */
-
 		SerialPutString("\r\n========================================");
 		SerialPutString("\r\n=           (C) COPYRIGHT 2023 HuNanHTJC BY dazhi                  =");
 		SerialPutString("\r\n=                                                                  =");
@@ -153,15 +158,31 @@ int main(void)
 			/* Jump to user application */
 			JumpAddress = *(__IO uint32_t*) (ApplicationAddress + 4);
 			Jump_To_Application = (pFunction) JumpAddress;
-			/* Initialize user application's Stack Pointer */
+			/* 设置程序运行的栈 */
 			__set_MSP(*(__IO uint32_t*) ApplicationAddress);
-			Jump_To_Application();
+			Jump_To_Application();  //
 		}
 	}
 
   while (1)
   {}
 }
+
+
+//void gd32_disable_phy(void)
+//{
+//	rcu_periph_clock_disable(RCU_GPIOA);
+//	rcu_periph_clock_disable(RCU_GPIOB);
+//	rcu_periph_clock_disable(RCU_GPIOC);
+//	rcu_periph_clock_disable(RCU_GPIOD);
+//	rcu_periph_clock_disable(RCU_GPIOE);
+//	rcu_periph_clock_disable(RCU_GPIOF);
+//	rcu_periph_clock_disable(RCU_GPIOG);
+//	rcu_periph_clock_disable(RCU_USART0);
+//	rcu_periph_clock_disable(RCU_USART1);
+//}
+
+
 
 /**
   * @brief  Initialize the IAP: Configure RCC, USART and GPIOs.
@@ -175,7 +196,9 @@ int main(void)
 void IAP_Init(void)
 {
     uint32_t com = USART0;
-				
+	
+//	gd32_disable_phy();
+	
     /*1. 使能GPIO时钟 enable GPIO clock */
     rcu_periph_clock_enable(RCU_GPIOA);
 
@@ -203,7 +226,6 @@ void IAP_Init(void)
 	//5. 接收中断的初始化。
 	//usart_interrupt_enable(com, USART_INT_RBNE);    //接收中断
 //	usart_interrupt_enable(com, USART_INT_ERR);
-	
 
 	//6. nvic的配置
 	//nvic_irq_enable(COM_NVIC[com_id],  COM_PRIO[com_id]>>2, COM_PRIO[com_id]&0x3);   //允许中断，并设置优先级
