@@ -36,7 +36,7 @@ typedef  void (*pFunction)(void);
 /* Constants used by Serial Command Line Mode */
 #define CMD_STRING_SIZE       128
 
-#define ApplicationAddress    0x8000000
+#define ApplicationAddress    0x8003000
 
 #if defined (GD32F10X_MD) || defined (GD32F10X_MD_VL)   //gd103vbt6 ÊÇ1k£¬128k
  #define PAGE_SIZE                         (0x400)    /* 1 Kbyte */

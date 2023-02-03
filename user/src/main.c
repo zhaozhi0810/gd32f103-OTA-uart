@@ -85,11 +85,11 @@ void Led_Show_Work_ToggleOut(void)
   */
 int main(void)
 {
-//	uint8_t key;
-//	uint16_t count = 0;
+	uint8_t key;
+	uint16_t count = 0;
 	uint8_t enter_iap = 0;	
 	
-	nvic_vector_table_set(NVIC_VECTTAB_FLASH, 0x1d000);   //注意变化！！！2023-02-01
+//	nvic_vector_table_set(NVIC_VECTTAB_FLASH, 0x1d000);   //注意变化！！！2023-02-01
 	
 	//0. 中断分组初始化
 	nvic_priority_group_set(NVIC_PRIGROUP_PRE2_SUB2);    //2022-09-09 优先级被我修改了，现在只有抢占优先级了！！
@@ -114,21 +114,21 @@ int main(void)
 	//__enable_irq(); // 开启总中断
 	
 	SerialPutString("=gd32 bootloader start======\r\n");
-	enter_iap = 1;
+	//enter_iap = 1;
   /* Initialize Key Button mounted on STM3210X-EVAL board */
   //STM_EVAL_PBInit();
-//	while(count++ < 200)  //等待1000次
-//	{
-//		if (SerialKeyPressed((uint8_t*)&key))
-//		{
-//			if(key == 3)//(key == 'c' || key == 'C')  //ctrl + c
-//			{
-//				enter_iap = 1;
-//				break;
-//			}
-//		}
-//		Delay1ms(1)	;	
-//	}
+	while(count++ < 200)  //等待1000次
+	{
+		if (SerialKeyPressed((uint8_t*)&key))
+		{
+			if(key == 3)//(key == 'c' || key == 'C')  //ctrl + c
+			{
+				enter_iap = 1;
+				break;
+			}
+		}
+		Delay1ms(1)	;	
+	}
   
 
   /*读串口数据，看是否有*/
