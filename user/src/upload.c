@@ -39,29 +39,28 @@
   */
 void SerialUpload(void)
 {
-  uint32_t status = 0; 
+	uint32_t status = 0; 
 
-  SerialPutString("\n\n\rSelect Receive File ... (press any key to abort)\n\r");
+	SerialPutString("\n\n\rSelect Receive File ... (press any key to abort)\n\r");
 
-  if (GetKey() == CRC16)
-  {
-    /* Transmit the flash image through ymodem protocol */
-    status = Ymodem_Transmit((uint8_t*)ApplicationAddress, (const uint8_t*)"UploadedFlashImage.bin", FLASH_IMAGE_SIZE);
+	if (Uploader_Get_Ready() == CRC16)  //大写字母C，这个是接收软件自己发的
+	{
+		/* Transmit the flash image through ymodem protocol */
+		status = Ymodem_Transmit((uint8_t*)ApplicationAddress, (const uint8_t*)"UploadedFlashImage.bin", FLASH_IMAGE_SIZE);
 
-    if (status != 0) 
-    {
-      SerialPutString("\n\rError Occured while Transmitting File\n\r");
-    }
-    else
-    {
-      SerialPutString("\n\rFile Trasmitted Successfully \n\r");
-    }
-  }
-  else
-  {
-    SerialPutString("\r\n\nAborted by user.\n\r");  
-  }
- 
+		if (status != 0) 
+		{
+			SerialPutString("\n\rError Occured while Transmitting File\n\r");
+		}
+		else
+		{
+			SerialPutString("\n\rFile Trasmitted Successfully \n\r");
+		}
+	}
+	else
+	{
+		SerialPutString("\r\n\nAborted by user.\n\r");  
+	}
 }
 
 /**

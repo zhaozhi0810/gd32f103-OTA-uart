@@ -17,6 +17,10 @@
 #include "common.h"
 #include "key.h"
 #include "systick.h"
+#include "uart.h"
+#include "update_flag.h"
+
+
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
@@ -24,8 +28,6 @@
 extern pFunction Jump_To_Application;
 extern uint32_t JumpAddress;
 
-/* Private function prototypes -----------------------------------------------*/
-static void IAP_Init(void);
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -42,7 +44,7 @@ const char* g_build_time_str = "Buildtime :"__DATE__" "__TIME__;   //ªÒµ√±‡“Î ±º
 
 void Led_Show_Work_init(void)
 {
-		// ±÷” πƒ‹
+	// ±÷” πƒ‹
 	rcu_periph_clock_enable(RCU_GPIOB);	
 		
 	gpio_init(GPIOB, GPIO_MODE_OUT_PP, GPIO_OSPEED_2MHZ, GPIO_PIN_4);	
@@ -75,7 +77,18 @@ void Led_Show_Work_ToggleOut(void)
 }
 
 
-
+static void OePins_Control_Init(void)
+{
+	//1.  ±÷” πƒ‹
+	rcu_periph_clock_enable(RCU_GPIOC);
+		
+	//2.0 …œµÁøÿ÷∆“˝Ω≈
+	gpio_init(GPIOC, GPIO_MODE_OUT_PP, GPIO_OSPEED_2MHZ, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3);  //øÿ÷∆ ‰≥ˆ	
+	//2. ≥ı ºªØ∫Û£¨ƒ¨»œ ‰≥ˆ∏ﬂ
+	gpio_bit_reset(GPIOC, GPIO_PIN_2);  //OE3  ‰≥ˆµÕ
+	
+	gpio_bit_set(GPIOC, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_3);  //∆‰À˚  ‰≥ˆ∏ﬂ
+}
 
 
 /**
@@ -100,8 +113,11 @@ int main(void)
 	//÷ª±£¡ÙswΩ”ø⁄£¨∆‰À˚”√”⁄GPIO∂Àø⁄
 	gpio_pin_remap_config(GPIO_SWJ_SWDPENABLE_REMAP, ENABLE);
 	
+	
+	OePins_Control_Init();    //OE“˝Ω≈µƒ≥ı ºªØ
+	
 	//¥Æø⁄≥ı ºªØ
-	IAP_Init();
+	IAP_Init(USART0);
 	
 	//led“˝Ω≈≥ı ºªØ≤ø∑÷
 	Led_Show_Work_init();
@@ -110,128 +126,92 @@ int main(void)
 	
 	/* Flash unlock */
 	fmc_unlock();
-
-	//__enable_irq(); // ø™∆Ù◊‹÷–∂œ
 	
-	SerialPutString("=gd32 bootloader start======\r\n");
-	//enter_iap = 1;
-  /* Initialize Key Button mounted on STM3210X-EVAL board */
-  //STM_EVAL_PBInit();
-	while(count++ < 200)  //µ»¥˝1000¥Œ
-	{
-		if (SerialKeyPressed((uint8_t*)&key))
+	
+	//≈–∂œ «∑Ò–Ë“™Õ®π˝rk3399…˝º∂
+	if(is_mcu_need_update())
+	{		
+		SerialPutString("=is_mcu_need_update == 1  ====\r\n");
+		
+		if(is_update_from_debug_uart() == 0)  //¥”rk3399¥Æø⁄…˝º∂£ø
 		{
-			if(key == 3)//(key == 'c' || key == 'C')  //ctrl + c
+			IAP_Init(USART1);   //≥ı ºªØ¥Æø⁄
+			
+			//send_readyto_recive();  //∑¢ÀÕø™ ºΩ” ’±Í÷æ
+			/* Download user application in the Flash */
+			SerialDownload();
+		}		
+	}
+	else  //µ˜ ‘¥Æø⁄ «∑Ò–Ë“™…˝º∂
+	{
+		//__enable_irq(); // ø™∆Ù◊‹÷–∂œ
+		
+		SerialPutString("=gd32 bootloader start======\r\n");
+		//enter_iap = 1;
+	  /* Initialize Key Button mounted on STM3210X-EVAL board */
+	  //STM_EVAL_PBInit();
+		while(count++ < 200)  //µ»¥˝1000¥Œ
+		{
+			if (SerialKeyPressed_Uart0((uint8_t*)&key))
 			{
-				enter_iap = 1;
-				break;
+				if(key == 3)//(key == 'c' || key == 'C')  //ctrl + c
+				{
+					enter_iap = 1;
+					break;
+				}
 			}
+			Delay1ms(1)	;	
 		}
-		Delay1ms(1)	;	
-	}
-  
+	
 
-  /*∂¡¥Æø⁄ ˝æ›£¨ø¥ «∑Ò”–*/
-	if(enter_iap)
-	{
-		/* If Key is pressed */
-		/* Execute the IAP driver in order to re-program the Flash */
-		SerialPutString("\r\n========================================");
-		SerialPutString("\r\n=           (C) COPYRIGHT 2023 HuNanHTJC BY dazhi                  =");
-		SerialPutString("\r\n=                                                                  =");
-		SerialPutString("\r\n=     In-Application Programming Application  (Version 3.3.1)      =");
-		SerialPutString("\r\n=                                                                  =");
-		SerialPutString("\r\n=     By Dazhi ");
-		SerialPutString(g_build_time_str);
-		SerialPutString("                     =");
-		SerialPutString("\r\n========================================");
-		SerialPutString("\r\n\r\n");
-		Main_Menu ();
-	}
-  /* Keep the user application running */
-	else
-	{
-		SerialPutString("= gd32 bootloader auto boot======\r\n");
-		/* Test if user code is programmed starting from address "ApplicationAddress" */
-		if (((*(__IO uint32_t*)ApplicationAddress) & 0x2FFE0000 ) == 0x20000000)
-		{ 
-			/* Jump to user application */
-			JumpAddress = *(__IO uint32_t*) (ApplicationAddress + 4);
-			Jump_To_Application = (pFunction) JumpAddress;
-			/* …Ë÷√≥Ã–Ú‘À––µƒ’ª */
-			__set_MSP(*(__IO uint32_t*) ApplicationAddress);
-			Jump_To_Application();  //
+	  /*∂¡¥Æø⁄ ˝æ›£¨ø¥ «∑Ò”–*/
+		if(enter_iap)
+		{
+			/* If Key is pressed */
+			/* Execute the IAP driver in order to re-program the Flash */
+			SerialPutString("\r\n========================================");
+			SerialPutString("\r\n=           (C) COPYRIGHT 2023 HuNanHTJC BY dazhi                  =");
+			SerialPutString("\r\n=                                                                  =");
+			SerialPutString("\r\n=     In-Application Programming Application  (Version 3.3.1)      =");
+			SerialPutString("\r\n=                                                                  =");
+			SerialPutString("\r\n=     By Dazhi ");
+			SerialPutString(g_build_time_str);
+			SerialPutString("                     =");
+			SerialPutString("\r\n========================================");
+			SerialPutString("\r\n\r\n");
+			Main_Menu ();
+		}
+	  /* Keep the user application running */
+		else
+		{
+			
 		}
 	}
-
-  while (1)
-  {}
+	
+	
+	//∆Ù∂Øapp
+	SerialPutString("= gd32 bootloader auto boot======\r\n");
+	/* Test if user code is programmed starting from address "ApplicationAddress" */
+	if (((*(__IO uint32_t*)ApplicationAddress) & 0x2FFE0000 ) == 0x20000000)
+	{ 
+		/* Jump to user application */
+		JumpAddress = *(__IO uint32_t*) (ApplicationAddress + 4);
+		Jump_To_Application = (pFunction) JumpAddress;
+		/* …Ë÷√≥Ã–Ú‘À––µƒ’ª */
+		__set_MSP(*(__IO uint32_t*) ApplicationAddress);
+		Jump_To_Application();  //
+	}
+	
+	SerialPutString("= gd32 bootloader error while 1======\r\n");
+	while (1)
+	{
+		SerialPutString("= gd32 bootloader error while 1======\r\n");
+		Delay1ms(1000);
+	}
 }
 
 
-//void gd32_disable_phy(void)
-//{
-//	rcu_periph_clock_disable(RCU_GPIOA);
-//	rcu_periph_clock_disable(RCU_GPIOB);
-//	rcu_periph_clock_disable(RCU_GPIOC);
-//	rcu_periph_clock_disable(RCU_GPIOD);
-//	rcu_periph_clock_disable(RCU_GPIOE);
-//	rcu_periph_clock_disable(RCU_GPIOF);
-//	rcu_periph_clock_disable(RCU_GPIOG);
-//	rcu_periph_clock_disable(RCU_USART0);
-//	rcu_periph_clock_disable(RCU_USART1);
-//}
 
-
-
-/**
-  * @brief  Initialize the IAP: Configure RCC, USART and GPIOs.
-  * @param  None
-  * @retval None
-
-	2023-01-31
-	÷˜“™ «≥ı ºªØ¥Æø⁄£¨Ω” ’≤ª π”√÷–∂œ°£GPA9,GPA10
-
-  */
-void IAP_Init(void)
-{
-    uint32_t com = USART0;
-	
-//	gd32_disable_phy();
-	
-    /*1.  πƒ‹GPIO ±÷” enable GPIO clock */
-    rcu_periph_clock_enable(RCU_GPIOA);
-
-    /*2.  πƒ‹uart ±÷” enable USART clock */
-    rcu_periph_clock_enable(RCU_USART0);
-
-    /*3. “˝Ω≈≥ı ºªØŒ™∏¥”√π¶ƒ‹ƒ£ Ω connect port to USARTx_Tx */
-    gpio_init(GPIOA, GPIO_MODE_AF_PP, GPIO_OSPEED_2MHZ, GPIO_PIN_9);
-
-    /*4. “˝Ω≈≥ı ºªØŒ™∏¥”√π¶ƒ‹ƒ£ Ω connect port to USARTx_Rx */
-    gpio_init(GPIOA, GPIO_MODE_IN_FLOATING, GPIO_OSPEED_2MHZ, GPIO_PIN_10);
-
-    /*4. uartøÿ÷∆∆˜≥ı ºªØ USART configure */
-    usart_deinit(com);
-    usart_baudrate_set(com, 115200);
-    usart_word_length_set(com, USART_WL_8BIT);   // ˝æ›Œª
-    usart_stop_bit_set(com, USART_STB_1BIT);    //Õ£÷πŒª
-    usart_parity_config(com, USART_PM_NONE);    //–£—ÈŒª
-    usart_hardware_flow_rts_config(com, USART_RTS_DISABLE);   //¡˜øÿ
-    usart_hardware_flow_cts_config(com, USART_CTS_DISABLE);
-    usart_receive_config(com, USART_RECEIVE_ENABLE);
-    usart_transmit_config(com, USART_TRANSMIT_ENABLE);
-    usart_enable(com);
-	
-	//5. Ω” ’÷–∂œµƒ≥ı ºªØ°£
-	//usart_interrupt_enable(com, USART_INT_RBNE);    //Ω” ’÷–∂œ
-//	usart_interrupt_enable(com, USART_INT_ERR);
-
-	//6. nvicµƒ≈‰÷√
-	//nvic_irq_enable(COM_NVIC[com_id],  COM_PRIO[com_id]>>2, COM_PRIO[com_id]&0x3);   //‘ –Ì÷–∂œ£¨≤¢…Ë÷√”≈œ»º∂
-	//nvic_irq_enable(USART0_IRQn,  3, 0);	//»´≤ø ««¿’º”≈œ»º∂
-
-}
 
 #ifdef USE_FULL_ASSERT
 /**

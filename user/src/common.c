@@ -16,7 +16,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "common.h"
 #include "ymodem.h"
-
+#include "uart.h"
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
@@ -147,6 +147,8 @@ uint32_t Str2Int(uint8_t *inputstr, int32_t *intnum)
   return res;
 }
 
+
+
 /**
   * @brief  Get an integer from the HyperTerminal
   * @param  num: The inetger
@@ -178,26 +180,9 @@ uint32_t GetIntegerInput(int32_t * num)
   }
 }
 
-/**
-  * @brief  Test to see if a key has been pressed on the HyperTerminal
-  * @param  key: The key pressed
-  * @retval 1: Correct
-  *         0: Error
-  */
-uint32_t SerialKeyPressed(uint8_t *key)
-{
-	if (SET == usart_flag_get(USART0, USART_FLAG_RBNE))
-	{
-		*key = (uint8_t)usart_data_receive(USART0);
-		return 1;
-	}
-	else
-	{
-		return 0;
-	}
-}
 
 /**
+	 从调试端口获取字符
   * @brief  Get a key from the HyperTerminal
   * @param  None
   * @retval The Key Pressed
@@ -209,22 +194,25 @@ uint8_t GetKey(void)
   /* Waiting for user input */
   while (1)
   {
+    if (SerialKeyPressed_Uart0((uint8_t*)&key)) break;
+  }
+  return key;
+}
+
+//从下载端口获得字符
+uint8_t Uploader_Get_Ready(void)
+{
+  uint8_t key = 0;
+
+  /* Waiting for user input */
+  while (1)
+  {
     if (SerialKeyPressed((uint8_t*)&key)) break;
   }
   return key;
-
 }
 
-/**
-  * @brief  Print a character on the HyperTerminal
-  * @param  c: The character to be printed
-  * @retval None
-  */
-void SerialPutChar(uint8_t c)
-{
-	while(RESET == usart_flag_get(USART0, USART_FLAG_TBE));
-	usart_data_transmit(USART0, (uint8_t)c); 
-}
+
 
 /**
   * @brief  Print a string on the HyperTerminal
@@ -239,6 +227,17 @@ void Serial_PutString(uint8_t *s)
     s++;
   }
 }
+
+
+void Serial_PutString_Uart0(uint8_t *s)
+{
+  while (*s != '\0')
+  {
+    SerialPutChar_uart0(*s);
+    s++;
+  }
+}
+
 
 /**
   * @brief  Get Input string from the HyperTerminal

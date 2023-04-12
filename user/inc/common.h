@@ -27,6 +27,8 @@
 #include "string.h"
 #include "gd32f10x.h"
 #include "ymodem.h"
+#include "update_flag.h"
+#include "uart.h"
 //#include "stm32_eval.h" 
 
 /* Exported types ------------------------------------------------------------*/
@@ -36,7 +38,7 @@ typedef  void (*pFunction)(void);
 /* Constants used by Serial Command Line Mode */
 #define CMD_STRING_SIZE       128
 
-#define ApplicationAddress    0x8003000
+#define ApplicationAddress    0x8006000
 
 #if defined (GD32F10X_MD) || defined (GD32F10X_MD_VL)   //gd103vbt6 是1k，128k
  #define PAGE_SIZE                         (0x400)    /* 1 Kbyte */
@@ -70,22 +72,27 @@ typedef  void (*pFunction)(void);
 #define CONVERTHEX_alpha(c)  (IS_AF(c) ? (c - 'A'+10) : (c - 'a'+10))
 #define CONVERTHEX(c)   (IS_09(c) ? (c - '0') : CONVERTHEX_alpha(c))
 
-#define SerialPutString(x) Serial_PutString((uint8_t*)(x))
+#define SerialPutString(x) Serial_PutString_Uart0((uint8_t*)(x))  //Serial_PutString((uint8_t*)(x))
 
 /* Exported functions ------------------------------------------------------- */
 void Int2Str(uint8_t* str,int32_t intnum);
 uint32_t Str2Int(uint8_t *inputstr,int32_t *intnum);
 uint32_t GetIntegerInput(int32_t * num);
 uint32_t SerialKeyPressed(uint8_t *key);
-uint8_t GetKey(void);
+uint8_t GetKey(void);  //从调试端口获取字符
 void SerialPutChar(uint8_t c);
 void Serial_PutString(uint8_t *s);
+void Serial_PutString_Uart0(uint8_t *s);
 void GetInputString(uint8_t * buffP);
 uint32_t FLASH_PagesMask(__IO uint32_t Size);
 void FLASH_DisableWriteProtectionPages(void);
 void Main_Menu(void);
 void SerialDownload(void);
 void SerialUpload(void);
+
+
+//从下载端口获得字符
+uint8_t Uploader_Get_Ready(void);
 
 #endif  /* _COMMON_H */
 
