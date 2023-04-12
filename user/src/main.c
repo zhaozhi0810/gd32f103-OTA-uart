@@ -7,6 +7,17 @@
   * @brief   Main program body
   ******************************************************************************
   本版本仅针对gd32f103VBT6 内存20K，flash 128K的情况，其他情况没有测试
+  0-23K : iap                (0~0x5c00-1)
+  23-24K  : record flags    (0x5c00~0x6000-1)
+  24-76K : app              (0x6000~0x13000-1)，所以二进制文件最大不能超过52k（0xd000）
+  76-128K : back download   (0x13000~0x20000-1)
+  
+  1. 先下载到  download 分区，然后下载成功（设置下载成功标志），再复制到 app分区 （设置复制成功标志）
+  2. 记录下载区的md5和app区的md5，不相同下次重启的时候完成升级
+  3. 下载前比较下载区的md5与实际需要下载的md5
+  4. 第一个128字节的包，改为文件名（最大64字节，包括\0）,文件长度（最大16字节，包括\0），增加下载文件的md5（33个字节，包括\0，md5需要32个字节存储）
+  5. 如果md5相同，则终止下载，直接进入app
+  6. 下载失败时，不予升级，不更新下载区的md5码
   */ 
 
 /** @addtogroup IAP
@@ -33,6 +44,14 @@ extern uint32_t JumpAddress;
 
 
 const char* g_build_time_str = "Buildtime :"__DATE__" "__TIME__;   //获得编译时间
+
+/*
+	rk3399的升级先下载到back区域，同时更新下载区的md5
+	如果是串口升级，直接下载到app区，更新下载区的md5和app的md5
+*/
+uint8_t is_cpu_update_cmd = 0;   //是rk3399的升级吗？
+
+
 
 
 
@@ -129,18 +148,25 @@ int main(void)
 	
 	
 	//判断是否需要通过rk3399升级
-	if(is_mcu_need_update())
-	{		
-		SerialPutString("=is_mcu_need_update == 1  ====\r\n");
-		
-		if(is_update_from_debug_uart() == 0)  //从rk3399串口升级？
+	if(is_mcu_need_download())
+	{
+		SerialPutString("=is_mcu_need_download == 1  ====\r\n");
 		{
 			IAP_Init(USART1);   //初始化串口
-			
-			//send_readyto_recive();  //发送开始接收标志
-			/* Download user application in the Flash */
-			SerialDownload();
-		}		
+			is_cpu_update_cmd = 1;   //设置一个标志
+			if(0 == SerialDownload())
+			{
+				mcu_download_done();
+				flash_download_copyto_app();  //下载成功后完成一次拷贝。
+			}
+		}
+	}
+	//判断是否需要从down区拷贝到app区
+	else if(is_mcu_need_update())
+	{		
+		SerialPutString("=is_mcu_need_update == 1  ====\r\n");
+		flash_download_copyto_app();
+				
 	}
 	else  //调试串口是否需要升级
 	{

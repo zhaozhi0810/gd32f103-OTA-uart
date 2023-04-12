@@ -36,8 +36,10 @@
 #define PACKET_SIZE             (128)
 #define PACKET_1K_SIZE          (1024)
 
-#define FILE_NAME_LENGTH        (256)
+#define FILE_NAME_LENGTH        (64)   //文件名长度最多64字节，包括结束符
 #define FILE_SIZE_LENGTH        (16)
+#define FILE_MD5_LENGTH         (32)   //MD5长度32字节，不包括结束符，2023-04-12增加
+
 
 #define SOH                     (0x01)  /* start of 128-byte data packet */
 #define STX                     (0x02)  /* start of 1024-byte data packet */

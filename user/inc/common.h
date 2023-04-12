@@ -39,11 +39,14 @@ typedef  void (*pFunction)(void);
 #define CMD_STRING_SIZE       128
 
 #define ApplicationAddress    0x8006000
+#define ApplicationDownAddress    (0x8000000 +  FLASH_SIZE)
+
+
 
 #if defined (GD32F10X_MD) || defined (GD32F10X_MD_VL)   //gd103vbt6 是1k，128k
  #define PAGE_SIZE                         (0x400)    /* 1 Kbyte */
- #define FLASH_SIZE                        (0x20000)  /* 128 KBytes */
- #define FLASH_ADDR_OFFSET                        (10)  /* 10 bits */
+ #define FLASH_SIZE                        (0x13000)   /* 52K+24K(0xd000+0x6000) 2023-04-12 *///(0x20000)  /* 128 KBytes */
+ #define FLASH_ADDR_OFFSET                  (10)  /* 10 bits */
 #elif defined STM32F10X_CL
  #define PAGE_SIZE                         (0x800)    /* 2 Kbytes */
  #define FLASH_SIZE                        (0x40000)  /* 256 KBytes */
@@ -58,7 +61,7 @@ typedef  void (*pFunction)(void);
 #endif
 
 /* Compute the FLASH upload image size */  
-#define FLASH_IMAGE_SIZE                   (uint32_t) (FLASH_SIZE - (ApplicationAddress - 0x08000000))
+#define FLASH_IMAGE_SIZE                   (uint32_t) (FLASH_SIZE - (ApplicationAddress - 0x08000000))  //52K
 
 /* Exported macro ------------------------------------------------------------*/
 /* Common routines */
@@ -74,6 +77,14 @@ typedef  void (*pFunction)(void);
 
 #define SerialPutString(x) Serial_PutString_Uart0((uint8_t*)(x))  //Serial_PutString((uint8_t*)(x))
 
+
+#define UPDATE_FLAG_START_ADDR   (ApplicationAddress-PAGE_SIZE)     //设置起始地址，0x8005c00
+#define DOWN_MD5_OFFET  512    //下载区的md5偏移地址
+
+//#define APP_MD5_OFFET   576    //APP区的md5偏移地址
+
+
+
 /* Exported functions ------------------------------------------------------- */
 void Int2Str(uint8_t* str,int32_t intnum);
 uint32_t Str2Int(uint8_t *inputstr,int32_t *intnum);
@@ -87,7 +98,7 @@ void GetInputString(uint8_t * buffP);
 uint32_t FLASH_PagesMask(__IO uint32_t Size);
 void FLASH_DisableWriteProtectionPages(void);
 void Main_Menu(void);
-void SerialDownload(void);
+uint8_t SerialDownload(void);
 void SerialUpload(void);
 
 

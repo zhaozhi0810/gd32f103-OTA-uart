@@ -39,6 +39,9 @@ uint32_t NbrOfPage = 0;
 fmc_state_enum FLASHStatus = FMC_READY;
 uint32_t RamSource;
 extern uint8_t tab_1024[1024];
+extern uint8_t md5sum_down[34];  //存放md5值
+extern uint8_t is_cpu_update_cmd;   //是rk3399的升级吗？ 非0表示从rk3399下载
+
 
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
@@ -152,9 +155,22 @@ int32_t Ymodem_Receive (uint8_t *buf)
 	uint8_t packet_data[PACKET_1K_SIZE + PACKET_OVERHEAD], file_size[FILE_SIZE_LENGTH], *file_ptr, *buf_ptr;
 	int32_t i, j, packet_length, session_done, file_done, packets_received, errors, session_begin, size = 0;
 	uint8_t key;
+	uint8_t *pdown_md5 = (void*)(UPDATE_FLAG_START_ADDR + DOWN_MD5_OFFET);
+	uint8_t md5_same = 0;  //md5相同为0，否则为1
+	uint32_t FlashDestination_const;	
+	
   /* Initialize FlashDestination variable */
-	FlashDestination = ApplicationAddress;
-
+	if(is_cpu_update_cmd) //rk3399下载的位置不同，是down分区
+	{
+		FlashDestination = ApplicationDownAddress;
+		
+	}
+	else{
+		FlashDestination = ApplicationAddress;
+	}
+	FlashDestination_const = FlashDestination;
+	//printf("FlashDestination = %#x\r\n",FlashDestination);
+	
 	for (session_done = 0, errors = 0, session_begin = 0; ;)
 	{
 		for (packets_received = 0, file_done = 0, buf_ptr = buf; ;)
@@ -162,8 +178,6 @@ int32_t Ymodem_Receive (uint8_t *buf)
 			switch (Receive_Packet(packet_data, &packet_length, NAK_TIMEOUT))
 			{
 				case 0:   //0: normally return
-					//printf("Receive_Packet ret = 0  packet_length = %d\r\n",packet_length);
-				
 					errors = 0;
 					switch (packet_length)
 					{
@@ -183,82 +197,125 @@ int32_t Ymodem_Receive (uint8_t *buf)
 								printf("packet_data[PACKET_SEQNO_INDEX] = %#x packets_received = %d\r\n",packet_data[PACKET_SEQNO_INDEX],packets_received);
 								Send_Byte(NAK);
 							}
-						else
-						{
-							if (packets_received == 0)
-							{
-								/* Filename packet */
-								if (packet_data[PACKET_HEADER] != 0)
-								{
-									/* Filename packet has valid data */
-									for (i = 0, file_ptr = packet_data + PACKET_HEADER; (*file_ptr != 0) && (i < FILE_NAME_LENGTH);)
-									{
-										file_name[i++] = *file_ptr++;
-									}
-									file_name[i++] = '\0';
-									for (i = 0, file_ptr ++; (*file_ptr != ' ') && (i < FILE_SIZE_LENGTH);)
-									{
-										file_size[i++] = *file_ptr++;
-									}
-									file_size[i++] = '\0';
-									Str2Int(file_size, &size);
-
-									/* Test the size of the image to be sent */
-									/* Image size is greater than Flash size */
-									if (size > (FLASH_SIZE - 1))
-									{
-										/* End session */
-										Send_Byte(CA);
-										Send_Byte(CA);
-										return -1;
-									}
-
-									/* Erase the needed pages where the user application will be loaded */
-									/* Define the number of page to be erased */
-									NbrOfPage = FLASH_PagesMask(size);
-
-									/* Erase the FLASH pages */
-									for (EraseCounter = 0; (EraseCounter < NbrOfPage) && (FLASHStatus == FMC_READY); EraseCounter++)
-									{
-									//  FLASHStatus = fmc_page_erase(FlashDestination + (PageSize * EraseCounter));
-									}
-									Send_Byte(ACK);
-									Send_Byte(CRC16);
-								}
-								/* Filename packet is empty, end session */
-								else
-								{
-									Send_Byte(ACK);
-									file_done = 1;
-									session_done = 1;
-									break;
-								}
-							}
-							/* Data packet */
 							else
 							{
-								memcpy(buf_ptr, packet_data + PACKET_HEADER, packet_length);
-								RamSource = (uint32_t)buf;
-								for (j = 0;(j < packet_length) && (FlashDestination <  ApplicationAddress + size);j += 4)
+								if (packets_received == 0)   //2023-04-12 增加
 								{
-									/* Program the data received into STM32F10x Flash */
-									//fmc_word_program(FlashDestination, *(uint32_t*)RamSource);
+									/* Filename packet */
+									if (packet_data[PACKET_HEADER] != 0)
+									{
+										/* Filename packet has valid data */
+										for (i = 0, file_ptr = packet_data + PACKET_HEADER; (*file_ptr != 0) && (i < FILE_NAME_LENGTH);)
+										{
+											file_name[i++] = *file_ptr++;
+										}
+										file_name[i++] = '\0';
+										for (i = 0, file_ptr ++; (*file_ptr != ' ') && (i < FILE_SIZE_LENGTH);)
+										{
+											file_size[i++] = *file_ptr++;
+										}
+										file_size[i++] = '\0';
+										Str2Int(file_size, &size);
 
-//									if (*(uint32_t*)FlashDestination != *(uint32_t*)RamSource)
-//									{
-//										/* End session */
-//										Send_Byte(CA);
-//										Send_Byte(CA);
-//										return -2;
-//									}
-									FlashDestination += 4;
-									RamSource += 4;
+										
+										for (i = 0, file_ptr ++; (*file_ptr != '\0') && (*pdown_md5 != '\0') &&(i < FILE_MD5_LENGTH);i++)
+										{
+											md5sum_down[i] = *(file_ptr+i);
+											if(*(pdown_md5+i) != *(file_ptr+i))
+											{
+												md5_same = 1;  //md5不同，可以升级
+											//	break;
+											}
+										}
+										
+										if(!md5_same) //md5一致，不升级
+										{										
+											/* End session */
+											Send_Byte(CA);
+											Send_Byte(CA);
+											printf("md5 same = %s\n",file_ptr);
+											return -1;
+										}
+										md5sum_down[i] = '\0';
+										/* Test the size of the image to be sent */
+										/* Image size is greater than Flash size */
+										if (size > (FLASH_IMAGE_SIZE - 1))  //FLASH_SIZE
+										{
+											/* End session */
+											Send_Byte(CA);
+											Send_Byte(CA);
+											return -1;
+										}
+
+										/* Erase the needed pages where the user application will be loaded */
+										/* Define the number of page to be erased */
+										NbrOfPage = FLASH_PagesMask(size);
+
+										/* Erase the FLASH pages */
+										for (EraseCounter = 0; (EraseCounter < NbrOfPage) && (FLASHStatus == FMC_READY); EraseCounter++)
+										{
+										  FLASHStatus = fmc_page_erase(FlashDestination + (PageSize * EraseCounter));
+										}
+										Send_Byte(ACK);
+										Send_Byte(CRC16);
+									}
+									/* Filename packet is empty, end session */
+									else
+									{
+										Send_Byte(ACK);
+										file_done = 1;
+										session_done = 1;
+										break;
+									}
 								}
-								Send_Byte(ACK);
+								/* Data packet */
+								else
+								{
+									memcpy(buf_ptr, packet_data + PACKET_HEADER, packet_length);
+									
+									if(packets_received == 0)  //可能下载的不是bin文件
+									{
+										if (((*(__IO uint32_t*)buf_ptr) & 0xfFFE0000 ) != 0x20000000)
+										{
+											Send_Byte(CA);
+											Send_Byte(CA);
+											printf("down file error 1,abort\r\n");
+											/* End session */
+											
+											return -2;
+										}
+										else if(((*(__IO uint32_t*)(buf_ptr+4)) & 0xfFFff000 ) != ApplicationAddress)
+										{
+											Send_Byte(CA);
+											Send_Byte(CA);
+											printf("down file error 2,abort\r\n");
+											/* End session */
+											
+											return -2;
+										}
+									}
+									
+									RamSource = (uint32_t)buf;
+									for (j = 0;(j < packet_length) && (FlashDestination <  FlashDestination_const + size);j += 4)
+									{
+										/* Program the data received into STM32F10x Flash */
+										fmc_word_program(FlashDestination, *(uint32_t*)RamSource);
+
+										if (*(uint32_t*)FlashDestination != *(uint32_t*)RamSource)
+										{
+											/* End session */
+											Send_Byte(CA);
+											Send_Byte(CA);
+											return -2;
+										}
+										FlashDestination += 4;
+										RamSource += 4;
+									}
+									Send_Byte(ACK);
+								}
+								packets_received ++;
+								session_begin = 1;
 							}
-							packets_received ++;
-							session_begin = 1;
-						}
 						}   //end  switch (packet_length)
 						break;
 					case 1:    //1: abort by user

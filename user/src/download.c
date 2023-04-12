@@ -30,23 +30,21 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 extern uint8_t file_name[FILE_NAME_LENGTH];
-uint8_t tab_1024[1024] =
-  {
-    0
-  };
-
+uint8_t tab_1024[1024] ={0};
+uint8_t md5sum_down[34] ={0};  //存放md5值
+int32_t Size = 0;   //存放固件大小，下载的值
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
 /**
   * @brief  Download a file via serial port
   * @param  None
-  * @retval None
+  * @retval 0 表示成功，其他表示失败
   */
-void SerialDownload(void)
+uint8_t SerialDownload(void)
 {
 	uint8_t Number[10] = "          ";
-	int32_t Size = 0;
+	
 	char str[20];
 
 	SerialPutString("Waiting for the file to be sent ... (press 'a' to abort)\n\r");
@@ -61,7 +59,11 @@ void SerialDownload(void)
 		SerialPutString("\n\r Size: ");
 		SerialPutString(Number);
 		SerialPutString(" Bytes\r\n");
+		SerialPutString("md5sum : ");
+		SerialPutString(md5sum_down);
+		SerialPutString(" \r\n");
 		SerialPutString("-------------------\n");
+		return 0;
 	}
 	else if (Size == -1)
 	{
@@ -79,6 +81,8 @@ void SerialDownload(void)
 	{
 		SerialPutString("\n\rFailed to receive the file!\n\r");
 	}
+	
+	return 1;
 }
 
 /**
