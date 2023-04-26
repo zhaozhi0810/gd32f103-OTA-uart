@@ -158,18 +158,18 @@ int32_t Ymodem_Receive (uint8_t *buf)
 	uint8_t *pdown_md5 = (void*)(UPDATE_FLAG_START_ADDR + DOWN_MD5_OFFET);
 	uint8_t md5_same = 0;  //md5相同为0，否则为1
 	uint32_t FlashDestination_const;	
-	
-  /* Initialize FlashDestination variable */
+	uint8_t time_out = 0;   //做一个计时，如果计数120次（大概两分钟？），就退出下载模式
+	/* Initialize FlashDestination variable */
 	if(is_cpu_update_cmd) //rk3399下载的位置不同，是down分区
 	{
-		FlashDestination = ApplicationDownAddress;
-		
+		FlashDestination = ApplicationDownAddress;		
 	}
 	else{
 		FlashDestination = ApplicationAddress;
+		
 	}
 	FlashDestination_const = FlashDestination;
-	//printf("FlashDestination = %#x\r\n",FlashDestination);
+	printf("FlashDestination = %#x\r\n",FlashDestination);
 	
 	for (session_done = 0, errors = 0, session_begin = 0; ;)
 	{
@@ -204,43 +204,57 @@ int32_t Ymodem_Receive (uint8_t *buf)
 									/* Filename packet */
 									if (packet_data[PACKET_HEADER] != 0)
 									{
+										//j=0;
 										/* Filename packet has valid data */
 										for (i = 0, file_ptr = packet_data + PACKET_HEADER; (*file_ptr != 0) && (i < FILE_NAME_LENGTH);)
 										{
 											file_name[i++] = *file_ptr++;
+										//	j++;
 										}
 										file_name[i++] = '\0';
-										for (i = 0, file_ptr ++; (*file_ptr != ' ') && (i < FILE_SIZE_LENGTH);)
+									//	printf("file_name = %s,j=%d\r\n",file_name,j);
+										for (i = 0, file_ptr ++; (*file_ptr != '\0') && (i < FILE_SIZE_LENGTH);)
 										{
 											file_size[i++] = *file_ptr++;
+										//	j++;
 										}
 										file_size[i++] = '\0';
+									//	printf("file_size = %s,j=%d\r\n",file_size,j);
 										Str2Int(file_size, &size);
 
-										
-										for (i = 0, file_ptr ++; (*file_ptr != '\0') && (*pdown_md5 != '\0') &&(i < FILE_MD5_LENGTH);i++)
+										if(is_cpu_update_cmd)  //rk3399下载才有md5码
 										{
-											md5sum_down[i] = *(file_ptr+i);
-											if(*(pdown_md5+i) != *(file_ptr+i))
+											for (i = 0, file_ptr ++; (i < FILE_MD5_LENGTH);i++) //(*file_ptr != '\0') &&&& (*(pdown_md5+i) != '\0') 
 											{
-												md5_same = 1;  //md5不同，可以升级
-											//	break;
+												md5sum_down[i] = *(file_ptr+i);
+											//	printf("*(pdown_md5+i) = %#x,*(file_ptr+i)=%#x,i=%d\r\n",*(pdown_md5+i),*(file_ptr+i),i);
+												if(*(pdown_md5+i) != *(file_ptr+i))
+												{
+													md5_same = 1;  //md5不同，可以升级
+												//	break;
+												}
+											//	j++;
 											}
+											md5sum_down[i] = '\0';
+											//printf("j=%d\r\n",j);
+											if(!md5_same) //md5一致，不升级
+											{										
+												/* End session */
+												Send_Byte(CA);
+												Send_Byte(CA);
+												printf("md5 is the same, md5 = %s i = %d\r\n",file_ptr,i);											
+											//	printf("md5sum_down = %s\r\n",md5sum_down);
+											//	printf("pdown_md5 addr = %p\r\n",pdown_md5);
+											//	printf("pdown_md5 = %s\r\n",pdown_md5);
+												return -4;
+											}
+											md5sum_down[i] = '\0';
 										}
-										
-										if(!md5_same) //md5一致，不升级
-										{										
-											/* End session */
-											Send_Byte(CA);
-											Send_Byte(CA);
-											printf("md5 same = %s\n",file_ptr);
-											return -1;
-										}
-										md5sum_down[i] = '\0';
 										/* Test the size of the image to be sent */
 										/* Image size is greater than Flash size */
 										if (size > (FLASH_IMAGE_SIZE - 1))  //FLASH_SIZE
 										{
+											printf("size(%d) > (FLASH_IMAGE_SIZE - 1)(%d)\r\n",size , (FLASH_IMAGE_SIZE - 1));
 											/* End session */
 											Send_Byte(CA);
 											Send_Byte(CA);
@@ -326,6 +340,7 @@ int32_t Ymodem_Receive (uint8_t *buf)
 						return -3;
 					default:    //-1: timeout or packet error
 						printf("-1: timeout or packet error\r\n");
+											
 						if (session_begin > 0)
 						{
 							errors ++;
@@ -334,6 +349,15 @@ int32_t Ymodem_Receive (uint8_t *buf)
 								printf("errors = %d\r\n",errors);
 								Send_Byte(CA);
 								Send_Byte(CA);
+								return 0;
+							}
+						}
+						else   //从没开始下载，那就设置一个超时时间
+						{
+							time_out++;
+							if(time_out >= 120)
+							{
+								printf("download timeout\r\n");
 								return 0;
 							}
 						}

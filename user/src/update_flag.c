@@ -8,6 +8,23 @@ VBT6  总共有128Kflash，把前面24K拿出来用于iap，剩下108K用于app(起始地址0x6000)
 其中0-22K共23k用于iap程序，23k(0x5c00)这个位置用于保存一些标志位update_flag_t结构体中的内容，
 
 这个flash 是1k页，擦除和编程都是1k为单位。
+
+
+状态标志的变化：
+1. 下载完成后，未更新，擦除flash，写入md5码  mcu_download_done(void)
+1.1 下载标志0xffff 表示不下载
+1.2 更新标识0xffff 表示需要更新
+
+
+2. 更新完成  mcu_update_done(void)
+2.1 更新标志0xff，表示不需要更新
+2.2 下载标志0xffff 表示不下载
+
+
+3.进入下载模式，通讯串口控制    goto_ota_update(void)
+2.1 下载标志0xff  表示需要下载
+2.2 更新标志0xff，表示不需要更新
+2.3 md5值还在
 */
 
 extern uint8_t tab_1024[1024];
@@ -16,6 +33,32 @@ extern int32_t Size;
 
 //起始地址
 static update_flag_t *g_updateflag = (void*)UPDATE_FLAG_START_ADDR;
+
+
+
+uint8_t goto_ota_update(void)
+{
+	printf("goto_ota_update \r\n");
+		
+	if(g_updateflag->need_download == 0xffff)  //已经是下载标志
+	{	
+		/* Flash unlock */
+		fmc_unlock();
+		//g_updateflag->need_update = 0x0f;    //表示是需要升级
+		//g_updateflag->update_where = 0x0f;   //表示是通信串口升级
+		fmc_halfword_program(UPDATE_FLAG_START_ADDR+2, 0xff);   //need_download需要下载
+	}
+	//NVIC_SystemReset(); // 复位
+	if(0==SerialDownload())
+	{
+		mcu_download_done();
+		flash_download_copyto_app();
+	}
+	return 0;
+}
+
+
+
 
 //单片机是否需要升级？
 //1.need_update 标志不是0xff或者0x0
@@ -62,7 +105,7 @@ void mcu_download_done(void)
 		md5sum_addr += 4;   //app_addr 一直再更新
 	}
 	
-	if(Size > 1024)  //至少大于1k
+	if(Size > 1024)  //至少大于1k，将数据的字节数写入
 	{
 		fmc_word_program(UPDATE_FLAG_START_ADDR+4, (uint32_t)(Size));
 	}
@@ -105,13 +148,13 @@ uint8_t flash_download_copyto_app(void)
 	
 	if (((*(__IO uint32_t*)download_addr) & 0xfFFE0000 ) != 0x20000000)
 	{
-		printf("not update\r\n");
+		printf("not update *download_addr %#x\r\n",(*(__IO uint32_t*)download_addr));
 		mcu_update_done();   //更新标志，不再升级
 		return 2;   //不能升级，rom不对
 	}
 	else if(((*(__IO uint32_t*)(download_addr+4)) & 0xfFFff000 ) != ApplicationAddress)
 	{
-		printf("not update 3\r\n");
+		printf("not update 3 *download_addr+4 = %#x\r\n",(*(__IO uint32_t*)(download_addr+4)));
 		mcu_update_done();   //更新标志，不再升级
 		return 2;   //不能升级，rom不对
 	}
@@ -159,7 +202,7 @@ uint8_t flash_download_copyto_app(void)
 	
 	//设置更新成功的标志，修改app md5值。
 	mcu_update_done();
-	
+	NVIC_SystemReset(); // 复位
 	return 0;
 }
 

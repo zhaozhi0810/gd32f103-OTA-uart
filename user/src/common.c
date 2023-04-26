@@ -26,7 +26,7 @@ uint32_t JumpAddress;
 uint32_t BlockNbr = 0, UserMemoryMask = 0;
 __IO uint32_t FlashProtection = 0;
 extern uint32_t FlashDestination;
-
+extern uint8_t is_cpu_update_cmd;   //是rk3399的升级吗？
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
@@ -155,30 +155,30 @@ uint32_t Str2Int(uint8_t *inputstr, int32_t *intnum)
   * @retval 1: Correct
   *         0: Error
   */
-uint32_t GetIntegerInput(int32_t * num)
-{
-  uint8_t inputstr[16];
+//uint32_t GetIntegerInput(int32_t * num)
+//{
+//  uint8_t inputstr[16];
 
-  while (1)
-  {
-    GetInputString(inputstr);
-    if (inputstr[0] == '\0') continue;
-    if ((inputstr[0] == 'a' || inputstr[0] == 'A') && inputstr[1] == '\0')
-    {
-      SerialPutString("User Cancelled \r\n");
-      return 0;
-    }
+//  while (1)
+//  {
+//    GetInputString(inputstr);
+//    if (inputstr[0] == '\0') continue;
+//    if ((inputstr[0] == 'a' || inputstr[0] == 'A') && inputstr[1] == '\0')
+//    {
+//      SerialPutString("User Cancelled \r\n");
+//      return 0;
+//    }
 
-    if (Str2Int(inputstr, num) == 0)
-    {
-      SerialPutString("Error, Input again: \r\n");
-    }
-    else
-    {
-      return 1;
-    }
-  }
-}
+//    if (Str2Int(inputstr, num) == 0)
+//    {
+//      SerialPutString("Error, Input again: \r\n");
+//    }
+//    else
+//    {
+//      return 1;
+//    }
+//  }
+//}
 
 
 /**
@@ -219,14 +219,14 @@ uint8_t Uploader_Get_Ready(void)
   * @param  s: The string to be printed
   * @retval None
   */
-void Serial_PutString(uint8_t *s)
-{
-  while (*s != '\0')
-  {
-    SerialPutChar(*s);
-    s++;
-  }
-}
+//void Serial_PutString(uint8_t *s)
+//{
+//  while (*s != '\0')
+//  {
+//    SerialPutChar(*s);
+//    s++;
+//  }
+//}
 
 
 void Serial_PutString_Uart0(uint8_t *s)
@@ -244,40 +244,40 @@ void Serial_PutString_Uart0(uint8_t *s)
   * @param  buffP: The input string
   * @retval None
   */
-void GetInputString (uint8_t * buffP)
-{
-  uint32_t bytes_read = 0;
-  uint8_t c = 0;
-  do
-  {
-    c = GetKey();
-    if (c == '\r')
-      break;
-    if (c == '\b') /* Backspace */
-    {
-      if (bytes_read > 0)
-      {
-        SerialPutString("\b \b");
-        bytes_read --;
-      }
-      continue;
-    }
-    if (bytes_read >= CMD_STRING_SIZE )
-    {
-      SerialPutString("Command string size overflow\r\n");
-      bytes_read = 0;
-      continue;
-    }
-    if (c >= 0x20 && c <= 0x7E)
-    {
-      buffP[bytes_read++] = c;
-      SerialPutChar(c);
-    }
-  }
-  while (1);
-  SerialPutString(("\n\r"));
-  buffP[bytes_read] = '\0';
-}
+//void GetInputString (uint8_t * buffP)
+//{
+//  uint32_t bytes_read = 0;
+//  uint8_t c = 0;
+//  do
+//  {
+//    c = GetKey();
+//    if (c == '\r')
+//      break;
+//    if (c == '\b') /* Backspace */
+//    {
+//      if (bytes_read > 0)
+//      {
+//        SerialPutString("\b \b");
+//        bytes_read --;
+//      }
+//      continue;
+//    }
+//    if (bytes_read >= CMD_STRING_SIZE )
+//    {
+//      SerialPutString("Command string size overflow\r\n");
+//      bytes_read = 0;
+//      continue;
+//    }
+//    if (c >= 0x20 && c <= 0x7E)
+//    {
+//      buffP[bytes_read++] = c;
+//      SerialPutChar(c);
+//    }
+//  }
+//  while (1);
+//  SerialPutString(("\n\r"));
+//  buffP[bytes_read] = '\0';
+//}
 
 /**
   * @brief  Calculate the number of pages
@@ -368,6 +368,164 @@ void FLASH_DisableWriteProtectionPages(void)
   }
 }
 
+
+void uart0_print_help(void)
+{
+	/* Test if any page of Flash memory where program user will be loaded is write protected */
+	if ((ob_write_protection_get() & UserMemoryMask) != UserMemoryMask)
+	{
+		FlashProtection = 1;
+	}
+	else
+	{
+		FlashProtection = 0;
+	}
+	
+	SerialPutString("\r\n================== Main Menu ============================\r\n");
+	SerialPutString("1.  Download Image To the GD32F10x Internal Flash\r\n");
+	SerialPutString("2.  Upload Image From the GD32F10x Internal Flash (debug  uart0)\r\n");
+	SerialPutString("3.  Download Image To the GD32F10x Internal Flash from rk3399 uart\r\n");
+	SerialPutString("4.  Reboot the system , Run APP \r\n");
+
+	if(FlashProtection != 0)
+	{
+	SerialPutString("5.  Disable the write protection\r\n");
+	}
+
+	SerialPutString("==========================================================\r\n");
+}
+
+
+
+void get_cmd_from_debug_uart0(void)
+{
+	uint8_t key;
+	
+	if(SerialKeyPressed_Uart0((uint8_t*)&key))
+	{
+		if (key == 0x31)
+		{
+			set_download_uart(0);
+			is_cpu_update_cmd = 0;
+			/* Download user application in the Flash */
+			if(0==SerialDownload())
+			{
+				printf("debug uart update done!\r\n");
+				mcu_update_done();
+				NVIC_SystemReset();
+			}
+		}
+		else if (key == 0x32)
+		{
+			set_download_uart(0);
+			/* Upload user application from the Flash */
+			SerialUpload();
+		}
+		else if (key == 0x33)
+		{
+			is_cpu_update_cmd = 1; //从3399下载
+			goto_ota_update();   //重启进入rk3399下载模式
+		}
+		else if (key == 0x34)
+		{
+			NVIC_SystemReset();    //2023-02-02  改为重启了
+//			JumpAddress = *(__IO uint32_t*) (ApplicationAddress + 4);
+
+//			/* Jump to user application */
+//			Jump_To_Application = (pFunction) JumpAddress;
+//			/* Initialize user application's Stack Pointer */
+//			__set_MSP(*(__IO uint32_t*) ApplicationAddress);
+//			Jump_To_Application();
+		}
+		else if ((key == 0x35) && (FlashProtection == 1))
+		{
+			/* Disable the write protection of desired pages */
+			FLASH_DisableWriteProtectionPages();
+		}
+		else
+		{
+			uart0_print_help();
+//			if (FlashProtection == 0)
+//			{
+//				SerialPutString("Invalid Number ! ==> The number should be either 1, 2 or 3\r");
+//			}
+//			else
+//			{
+//				SerialPutString("Invalid Number ! ==> The number should be either 1, 2, 3 or 4\r");
+//			} 
+		}
+	}
+}
+
+
+
+
+
+
+
+
+void get_cmd_from_rk3399_uart1(void)
+{
+	uint8_t key,i;
+	uint8_t *pflash_md5 = (void*)(UPDATE_FLAG_START_ADDR + DOWN_MD5_OFFET);
+	static uint8_t buf[8];
+	static uint8_t index = 0;
+	uint8_t  checksum = 0;
+	
+	if(SerialKeyPressed_Uart1((uint8_t*)&key))
+	{		
+		if(key == 0xa5)
+			index = 0;
+		
+		buf[index] = key;
+		
+		if(index < 4)
+		{
+			index ++;
+			if(index == 4)
+			{
+				printf("index = 4\r\n");
+				if(buf[1] == 74) 
+				{	
+				//	set_download_uart(1); //通讯串口
+					if((buf[2] == 0) && (buf[3] == 0xef))  //是升级命令
+					{
+						checksum = (uint8_t)(0x5a+0xa5);
+						SerialPutChar_uart1(0x5a);					
+						SerialPutChar_uart1(0xa5);						
+						//1. 上传md5码
+						for (i = 0; (i < FILE_MD5_LENGTH);i++)
+						{
+							SerialPutChar_uart1(pflash_md5[i]);
+							
+							checksum += pflash_md5[i];							
+						}
+						SerialPutChar_uart1(checksum);  //总共35个字节！！！！
+						//printf("(buf[2] == 0) && (buf[3] == 0xef) checksum = %d\r\n",checksum);
+					}
+					else if((buf[2] == 1) && (buf[3] == 0xf0))  //上位机确认需要下载更新
+					{
+					//	printf("(buf[2] == 1) && (buf[3] == 0xf0)\r\n");
+						is_cpu_update_cmd = 1; //从3399下载
+						//设置下载标记，重启
+						goto_ota_update();
+					}
+				}
+				index = 0;
+			}
+		}
+		else
+			index = 0;
+	}
+
+}
+
+
+
+
+
+
+
 /**
   * @brief  Display the Main Menu on to HyperTerminal
   * @param  None
@@ -375,7 +533,7 @@ void FLASH_DisableWriteProtectionPages(void)
   */
 void Main_Menu(void)
 {
-	uint8_t key = 0;
+//	uint8_t key = 0;
 
 	/* Get the number of block (4 or 2 pages) from where the user program will be loaded */
 	BlockNbr = (FlashDestination - 0x08000000) >> FLASH_ADDR_OFFSET;
@@ -395,69 +553,12 @@ void Main_Menu(void)
 	}
 #endif /* (STM32F10X_MD) || (STM32F10X_MD_VL) */
 
-	/* Test if any page of Flash memory where program user will be loaded is write protected */
-	if ((ob_write_protection_get() & UserMemoryMask) != UserMemoryMask)
-	{
-		FlashProtection = 1;
-	}
-	else
-	{
-		FlashProtection = 0;
-	}
+	uart0_print_help();
 
 	while (1)
 	{
-		SerialPutString("\r\n================== Main Menu ============================\r\n");
-		SerialPutString("1.  Download Image To the GD32F10x Internal Flash\r\n");
-		SerialPutString("2.  Upload Image From the GD32F10x Internal Flash\r\n");
-		SerialPutString("3.  Execute The New Program \r\n");
-		
-		if(FlashProtection != 0)
-		{
-			SerialPutString("4.  Disable the write protection\r\n");
-		}
-
-		SerialPutString("==========================================================\r\n");
-
-		key = GetKey();
-
-		if (key == 0x31)
-		{
-			/* Download user application in the Flash */
-			SerialDownload();
-		}
-		else if (key == 0x32)
-		{
-			/* Upload user application from the Flash */
-			SerialUpload();
-		}
-		else if (key == 0x33)
-		{
-			NVIC_SystemReset();    //2023-02-02  改为重启了
-//			JumpAddress = *(__IO uint32_t*) (ApplicationAddress + 4);
-
-//			/* Jump to user application */
-//			Jump_To_Application = (pFunction) JumpAddress;
-//			/* Initialize user application's Stack Pointer */
-//			__set_MSP(*(__IO uint32_t*) ApplicationAddress);
-//			Jump_To_Application();
-		}
-		else if ((key == 0x34) && (FlashProtection == 1))
-		{
-			/* Disable the write protection of desired pages */
-			FLASH_DisableWriteProtectionPages();
-		}
-		else
-		{
-			if (FlashProtection == 0)
-			{
-				SerialPutString("Invalid Number ! ==> The number should be either 1, 2 or 3\r");
-			}
-			else
-			{
-				SerialPutString("Invalid Number ! ==> The number should be either 1, 2, 3 or 4\r");
-			} 
-		}
+		get_cmd_from_debug_uart0();   //从调试串口判断是否需要更新
+		get_cmd_from_rk3399_uart1();  //从通讯串口（rk3399）判断是否更新。
 	}
 }
 

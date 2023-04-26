@@ -505,6 +505,12 @@
           <targetInfo name="Target 1"/>
         </targetInfos>
       </component>
+      <component Cclass="Device" Cgroup="GD32F10x_StdPeripherals" Csub="FWDGT" Cvendor="GigaDevice" Cversion="2.0.1" condition="GD32F10x STDPERIPHERALS RCU">
+        <package name="GD32F10x_DFP" schemaVersion="1.2" url="http://www.keil.com/pack/" vendor="GigaDevice" version="2.0.1"/>
+        <targetInfos>
+          <targetInfo name="Target 1"/>
+        </targetInfos>
+      </component>
       <component Cclass="Device" Cgroup="GD32F10x_StdPeripherals" Csub="GPIO" Cvendor="GigaDevice" Cversion="2.0.1" condition="GD32F10x STDPERIPHERALS RCU">
         <package name="GD32F10x_DFP" schemaVersion="1.2" url="http://www.keil.com/pack/" vendor="GigaDevice" version="2.0.1"/>
         <targetInfos>
@@ -552,6 +558,14 @@
       <file attr="config" category="source" name="Device\Firmware\Peripherals\src\gd32f10x_fmc.c" version="2.0.1">
         <instance index="0">RTE\Device\GD32F103VB\gd32f10x_fmc.c</instance>
         <component Cclass="Device" Cgroup="GD32F10x_StdPeripherals" Csub="FMC" Cvendor="GigaDevice" Cversion="2.0.1" condition="GD32F10x STDPERIPHERALS RCU"/>
+        <package name="GD32F10x_DFP" schemaVersion="1.2" url="http://www.keil.com/pack/" vendor="GigaDevice" version="2.0.1"/>
+        <targetInfos>
+          <targetInfo name="Target 1"/>
+        </targetInfos>
+      </file>
+      <file attr="config" category="source" name="Device\Firmware\Peripherals\src\gd32f10x_fwdgt.c" version="2.0.1">
+        <instance index="0">RTE\Device\GD32F103VB\gd32f10x_fwdgt.c</instance>
+        <component Cclass="Device" Cgroup="GD32F10x_StdPeripherals" Csub="FWDGT" Cvendor="GigaDevice" Cversion="2.0.1" condition="GD32F10x STDPERIPHERALS RCU"/>
         <package name="GD32F10x_DFP" schemaVersion="1.2" url="http://www.keil.com/pack/" vendor="GigaDevice" version="2.0.1"/>
         <targetInfos>
           <targetInfo name="Target 1"/>

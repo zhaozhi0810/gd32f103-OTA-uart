@@ -15,18 +15,18 @@
 
   */
   
-static uint32_t com_real;   //实际下载使用的串口
+static uint32_t update_com_real = USART1;   //需要看看命令是从哪来的
   
   
 void IAP_Init(uint32_t com)
 {	
     /*1. 使能GPIO时钟 enable GPIO clock */
     rcu_periph_clock_enable(RCU_GPIOA);
-	com_real = USART0;   //实际使用的是串口0
+//	com_real = USART0;   //实际使用的是串口0
 	
 	if(com == USART1)  //USART1 仍然需要USART0的协助
 	{
-		com_real = USART1; //实际使用的是串口1
+		update_com_real = USART1; //实际使用的是串口1
 		/*2. 使能uart时钟 enable USART clock */
 		rcu_periph_clock_enable(RCU_USART1);
 		/*3. 引脚初始化为复用功能模式 connect port to USARTx_Tx */
@@ -58,6 +58,19 @@ void IAP_Init(uint32_t com)
 
 
 
+void set_download_uart(uint8_t index)
+{
+	if(index == 0)
+	{
+		update_com_real = USART0;   //从调试串口下载更新。
+	}
+	else
+		update_com_real = USART1;
+}
+
+
+
+
 
 /**
   * @brief  Test to see if a key has been pressed on the HyperTerminal
@@ -67,9 +80,9 @@ void IAP_Init(uint32_t com)
   */
 uint32_t SerialKeyPressed(uint8_t *key)
 {
-	if (SET == usart_flag_get(com_real, USART_FLAG_RBNE))
+	if (SET == usart_flag_get(update_com_real, USART_FLAG_RBNE))
 	{
-		*key = (uint8_t)usart_data_receive(com_real);
+		*key = (uint8_t)usart_data_receive(update_com_real);
 	//	printf("key = %#x\r\n",*key);
 		return 1;
 	}
@@ -80,26 +93,33 @@ uint32_t SerialKeyPressed(uint8_t *key)
 }
 
 
+//从通讯串口下载
+uint32_t SerialKeyPressed_Uart1(uint8_t *key)
+{
+	if (SET == usart_flag_get(USART1, USART_FLAG_RBNE))
+	{
+		*key = (uint8_t)usart_data_receive(USART1);
+	//	printf("key = %#x\r\n",*key);
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
+}
 
 //调试串口按键检测
 uint32_t SerialKeyPressed_Uart0(uint8_t *key)
 {
-	if(com_real != USART0)
+	if (SET == usart_flag_get(USART0, USART_FLAG_RBNE))
 	{
-		if (SET == usart_flag_get(USART0, USART_FLAG_RBNE))
-		{
-			*key = (uint8_t)usart_data_receive(USART0);
-		//	printf("key = %#x\r\n",*key);
-			return 1;
-		}
-		else
-		{
-			return 0;
-		}
+		*key = (uint8_t)usart_data_receive(USART0);
+	//	printf("key = %#x\r\n",*key);
+		return 1;
 	}
 	else
 	{
-		return SerialKeyPressed(key);
+		return 0;
 	}
 //	return 0;
 }
@@ -111,14 +131,20 @@ uint32_t SerialKeyPressed_Uart0(uint8_t *key)
   */
 void SerialPutChar(uint8_t c)
 {
-	while(RESET == usart_flag_get(com_real, USART_FLAG_TBE));
-	usart_data_transmit(com_real, (uint8_t)c); 
+	while(RESET == usart_flag_get(update_com_real, USART_FLAG_TC));
+	usart_data_transmit(update_com_real, (uint8_t)c); 
 }
 
 
+void SerialPutChar_uart1(uint8_t c)
+{
+	while(RESET == usart_flag_get(USART1, USART_FLAG_TC));
+	usart_data_transmit(USART1, (uint8_t)c); 
+}
+
 void SerialPutChar_uart0(uint8_t c)
 {
-	while(RESET == usart_flag_get(USART0, USART_FLAG_TBE));
+	while(RESET == usart_flag_get(USART0, USART_FLAG_TC));
 	usart_data_transmit(USART0, (uint8_t)c); 
 }
 
@@ -127,7 +153,8 @@ void SerialPutChar_uart0(uint8_t c)
 /* retarget the C library printf function to the USART */
 int fputc(int ch, FILE *f)
 {
-    SerialPutChar_uart0(ch);
+	if(update_com_real != 0)
+		SerialPutChar_uart0(ch);
 	return ch;
 }
 

@@ -38,6 +38,10 @@ uint8_t flash_download_copyto_app(void);
 
 //下载完成
 void mcu_download_done(void);
+
+//重启进入rk3399下载模式
+uint8_t goto_ota_update(void);
+
 //循环发送准备接收标志
 //void send_readyto_recive(void);
 #endif

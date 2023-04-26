@@ -75,6 +75,7 @@ typedef  void (*pFunction)(void);
 #define CONVERTHEX_alpha(c)  (IS_AF(c) ? (c - 'A'+10) : (c - 'a'+10))
 #define CONVERTHEX(c)   (IS_09(c) ? (c - '0') : CONVERTHEX_alpha(c))
 
+//这个打印只能从调试串口打印！！！
 #define SerialPutString(x) Serial_PutString_Uart0((uint8_t*)(x))  //Serial_PutString((uint8_t*)(x))
 
 
