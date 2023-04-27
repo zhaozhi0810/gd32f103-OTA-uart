@@ -153,7 +153,7 @@ void SerialPutChar_uart0(uint8_t c)
 /* retarget the C library printf function to the USART */
 int fputc(int ch, FILE *f)
 {
-	if(update_com_real != 0)
+//	if(update_com_real != USART0)
 		SerialPutChar_uart0(ch);
 	return ch;
 }

@@ -165,11 +165,10 @@ int32_t Ymodem_Receive (uint8_t *buf)
 		FlashDestination = ApplicationDownAddress;		
 	}
 	else{
-		FlashDestination = ApplicationAddress;
-		
+		FlashDestination = ApplicationAddress;		
 	}
 	FlashDestination_const = FlashDestination;
-	printf("FlashDestination = %#x\r\n",FlashDestination);
+//	printf("FlashDestination = %#x\r\n",FlashDestination);
 	
 	for (session_done = 0, errors = 0, session_begin = 0; ;)
 	{
@@ -213,7 +212,10 @@ int32_t Ymodem_Receive (uint8_t *buf)
 										}
 										file_name[i++] = '\0';
 									//	printf("file_name = %s,j=%d\r\n",file_name,j);
-										for (i = 0, file_ptr ++; (*file_ptr != '\0') && (i < FILE_SIZE_LENGTH);)
+//										while(*file_ptr == 0)
+//											file_ptr ++;
+										//*file_ptr != '\0' ||
+										for (i = 0,file_ptr ++; ( *file_ptr != ' ') && (i < FILE_SIZE_LENGTH);)
 										{
 											file_size[i++] = *file_ptr++;
 										//	j++;
